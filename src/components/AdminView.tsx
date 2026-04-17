@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Asset, ASSET_CATEGORIES } from '../types';
+import { GoogleAuth } from './GoogleAuth';
+import { Cloud, RefreshCw } from 'lucide-react';
 
 export const AdminView = ({ 
   socialLinks,
@@ -27,7 +29,10 @@ export const AdminView = ({
   editingAsset,
   setEditingAsset,
   isAssetModalOpen,
-  setIsAssetModalOpen
+  setIsAssetModalOpen,
+  googleAccessToken,
+  onGoogleAuthSuccess,
+  onGoogleLogout
 }: { 
   socialLinks: { facebook: string, instagram: string, linkedin: string, tiktok: string },
   onUpdateSocialLinks: (links: any) => void,
@@ -39,7 +44,10 @@ export const AdminView = ({
   editingAsset: Asset | null,
   setEditingAsset: Dispatch<SetStateAction<Asset | null>>,
   isAssetModalOpen: boolean,
-  setIsAssetModalOpen: Dispatch<SetStateAction<boolean>>
+  setIsAssetModalOpen: Dispatch<SetStateAction<boolean>>,
+  googleAccessToken: string | null,
+  onGoogleAuthSuccess: (token: string, expiresAt: number) => void,
+  onGoogleLogout: () => void
 }) => {
   const [localLinks, setLocalLinks] = useState(socialLinks);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -59,6 +67,35 @@ export const AdminView = ({
 
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
+        <div className="flex flex-col md:flex-row gap-6 items-start justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-50 rounded-xl">
+              <Cloud className="w-6 h-6 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">Google Drive Connectivity</h3>
+              <p className="text-xs text-slate-500">Connect or disconnect the marketing shared drive.</p>
+            </div>
+          </div>
+          <GoogleAuth 
+            accessToken={googleAccessToken} 
+            onAuthSuccess={onGoogleAuthSuccess} 
+            onLogout={onGoogleLogout} 
+          />
+        </div>
+
+        {googleAccessToken && (
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <p className="text-sm font-medium text-slate-700">Connected to Google Drive</p>
+            </div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Session</p>
+          </div>
+        )}
+      </div>
+
       {/* Asset Management */}
       <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
         <div className="flex items-center justify-between mb-8">
@@ -84,33 +121,48 @@ export const AdminView = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {assets.map(asset => (
-            <div key={asset.id} className="p-4 border border-slate-100 rounded-xl bg-slate-50/30 flex items-center justify-between group">
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-900 truncate">{asset.title}</p>
-                <p className="text-[10px] text-slate-500">{asset.category}</p>
+        <div className="space-y-8">
+          {ASSET_CATEGORIES.map(category => {
+            const categoryAssets = assets.filter(a => a.category === category);
+            if (categoryAssets.length === 0) return null;
+            
+            return (
+              <div key={category} className="space-y-3">
+                <h4 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">{category}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {categoryAssets.map(asset => (
+                    <div key={asset.id} className="p-4 border border-slate-100 rounded-xl bg-slate-50/30 flex items-center justify-between group">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{asset.title}</p>
+                        <p className="text-[10px] text-slate-500">{asset.category}</p>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => {
+                            setEditingAsset(asset);
+                            setAssetFormData(asset);
+                            setIsAssetModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-white rounded-lg transition-all"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteAsset(asset.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                  onClick={() => {
-                    setEditingAsset(asset);
-                    setAssetFormData(asset);
-                    setIsAssetModalOpen(true);
-                  }}
-                  className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-white rounded-lg transition-all"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => handleDeleteAsset(asset.id)}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
+          {assets.length === 0 && (
+            <div className="text-center py-8 text-slate-500 text-sm">No assets found. Add one above.</div>
+          )}
         </div>
       </div>
 

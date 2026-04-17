@@ -47,6 +47,7 @@ import { persistenceService } from './services/persistenceService';
 
 import { AdminView } from './components/AdminView';
 import { AssetsView } from './components/AssetsView';
+import { ROOT_FOLDER_ID } from './hooks/useGoogleDrive';
 
 enum OperationType {
   CREATE = 'create',
@@ -78,12 +79,21 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [socialLinks, setSocialLinks] = useState({
     facebook: '',
     instagram: '',
     linkedin: '',
     tiktok: ''
+  });
+  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(() => {
+    const token = localStorage.getItem('drive_token');
+    const expiresAt = localStorage.getItem('drive_expires_at');
+    if (token && expiresAt && Date.now() < parseInt(expiresAt)) {
+      return token;
+    }
+    return null;
   });
 
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -132,6 +142,18 @@ export default function App() {
     } catch (err) {
       console.error("Logout failed:", err);
     }
+  };
+
+  const handleGoogleAuthSuccess = (token: string, expiresAt: number) => {
+    setGoogleAccessToken(token);
+    localStorage.setItem('drive_token', token);
+    localStorage.setItem('drive_expires_at', expiresAt.toString());
+  };
+
+  const handleGoogleLogout = () => {
+    setGoogleAccessToken(null);
+    localStorage.removeItem('drive_token');
+    localStorage.removeItem('drive_expires_at');
   };
 
   const handleSaveAsset = async () => {
@@ -327,6 +349,13 @@ export default function App() {
             {viewMode === 'assets' ? 'Marketing Assets' : 'Admin Center'}
           </h1>
           <div className="flex items-center gap-6">
+            <button
+              onClick={() => setIsRequestModalOpen(true)}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl text-sm font-bold transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Request Asset
+            </button>
             {/* Social Links in Header */}
             <div className="hidden md:flex items-center gap-3">
               {socialLinks.facebook && (
@@ -383,6 +412,8 @@ export default function App() {
                 setCategoryFilter={setAssetCategoryFilter}
                 searchQuery={assetSearchQuery}
                 setSearchQuery={setAssetSearchQuery}
+                googleAccessToken={googleAccessToken}
+                onGoogleLogout={handleGoogleLogout}
               />
             ) : (
               <AdminView 
@@ -397,11 +428,85 @@ export default function App() {
                 setEditingAsset={setEditingAsset}
                 isAssetModalOpen={isAssetModalOpen}
                 setIsAssetModalOpen={setIsAssetModalOpen}
+                googleAccessToken={googleAccessToken}
+                onGoogleAuthSuccess={handleGoogleAuthSuccess}
+                onGoogleLogout={handleGoogleLogout}
               />
             )}
           </div>
         </main>
       </div>
+
+      {/* Request Asset Modal */}
+      <AnimatePresence>
+        {isRequestModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary-dark/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h2 className="text-lg font-bold text-slate-900">Request an Asset</h2>
+                <button onClick={() => setIsRequestModalOpen(false)} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  alert('✅ Request submitted! Marketing team will review and add the asset soon.');
+                  setIsRequestModalOpen(false);
+                }}
+              >
+                <div className="p-6 space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Your Name</label>
+                    <input 
+                      required
+                      type="text" 
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                      placeholder="John Doe"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Department</label>
+                    <select 
+                      required
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                    >
+                      <option value="">Select...</option>
+                      <option value="Sales">Sales</option>
+                      <option value="Engineering">Engineering</option>
+                      <option value="Customer Success">Customer Success</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Requested Asset</label>
+                    <input 
+                      required
+                      type="text" 
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                      placeholder="e.g. Holiday campaign banner"
+                    />
+                  </div>
+                </div>
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                  <button type="button" onClick={() => setIsRequestModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
+                  <button 
+                    type="submit"
+                    className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-primary-dark text-sm font-bold rounded-lg transition-colors shadow-sm"
+                  >
+                    Submit Request
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
