@@ -18,7 +18,7 @@ export const useGoogleDrive = (
     setError(null);
     try {
       const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${currentFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,thumbnailLink,webViewLink)&key=${API_KEY}`,
+        `https://www.googleapis.com/drive/v3/files?q='${currentFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink)&key=${API_KEY}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -58,7 +58,7 @@ export const useGoogleDrive = (
       formData.append('file', file);
 
       const response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,thumbnailLink,webViewLink',
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,thumbnailLink,webViewLink,webContentLink',
         {
           method: 'POST',
           headers: {

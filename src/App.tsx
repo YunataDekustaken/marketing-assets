@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, 
   Search, 
@@ -22,16 +22,12 @@ import {
   Info,
   PanelLeftClose,
   PanelLeftOpen,
-  Facebook,
-  Instagram,
-  Linkedin,
   FolderOpen,
-  FileText,
-  Sparkles,
-  Music2
+  Folder,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Asset, ASSET_CATEGORIES, ViewMode } from './types';
+import { ViewMode } from './types';
 import { auth, db, googleProvider, isFirebaseConfigured } from './firebase';
 import { 
   onAuthStateChanged, 
@@ -66,27 +62,60 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('assets');
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [assetCategoryFilter, setAssetCategoryFilter] = useState('All');
-  const [assetSearchQuery, setAssetSearchQuery] = useState('');
-  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-  const [assetFormData, setAssetFormData] = useState<Partial<Asset>>({
-    title: '',
-    category: ASSET_CATEGORIES[0],
-    link: ''
-  });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [socialLinks, setSocialLinks] = useState({
-    facebook: '',
-    instagram: '',
-    linkedin: '',
-    tiktok: ''
+  const [toasts, setToasts] = useState<{id: string, message: string, type: 'success' | 'info' | 'error'}[]>([]);
+  const [selectedPreviewFile, setSelectedPreviewFile] = useState<any | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<any | null>(null);
+  const [homeResetToken, setHomeResetToken] = useState(0);
+  const [quickLinks, setQuickLinks] = useState<{id: string, name: string, url: string}[]>([
+    { id: '1', name: 'Marketing Guidelines', url: '#' },
+    { id: '2', name: 'Brand Voice Guide', url: '#' },
+    { id: '3', name: 'Support Desk', url: '#' }
+  ]);
+  const [pinnedAssets, setPinnedAssets] = useState<any[]>([]);
+
+  const [notificationSettings, setNotificationSettings] = useState({
+    driveUploads: true,
+    fileDownloads: true,
+    connectivityIssues: true,
+    storageQuota: false,
+    systemMaintenance: true
   });
+
+  const addNotification = (
+    title: string,
+    message: string, 
+    type: 'info' | 'success' | 'warning' = 'info', 
+    settingKey?: keyof typeof notificationSettings,
+    file?: any
+  ) => {
+    // If settingKey is provided, check if it's enabled in settings
+    const isEnabled = !settingKey || (notificationSettings as any)[settingKey] !== false;
+
+    if (isEnabled) {
+      const newNotification = {
+        id: Date.now().toString(),
+        title,
+        message,
+        type,
+        time: 'Just now',
+        read: false,
+        file
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+    }
+    
+    // Toasts are always shown for immediate feedback regardless of history settings
+    const toastId = Date.now().toString();
+    setToasts(prev => [...prev, { id: toastId, message, type: type === 'warning' ? 'error' : type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== toastId));
+    }, 4000);
+  };
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(() => {
     const token = localStorage.getItem('drive_token');
     const expiresAt = localStorage.getItem('drive_expires_at');
@@ -111,13 +140,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = persistenceService.subscribeToAssets((data) => {
-      setAssets(data);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
@@ -130,8 +152,10 @@ export default function App() {
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
+      addNotification('Welcome back!', 'You have signed in successfully.', 'success');
     } catch (err) {
       console.error("Login failed:", err);
+      addNotification('Auth Error', 'Sign in failed. Please try again.', 'warning');
     }
   };
 
@@ -139,6 +163,7 @@ export default function App() {
     try {
       await signOut(auth);
       setViewMode('assets');
+      addNotification('Account', 'You have been signed out successfully.', 'info');
     } catch (err) {
       console.error("Logout failed:", err);
     }
@@ -148,47 +173,35 @@ export default function App() {
     setGoogleAccessToken(token);
     localStorage.setItem('drive_token', token);
     localStorage.setItem('drive_expires_at', expiresAt.toString());
+    addNotification('Google Drive', 'Shared marketing drive connected successfully.', 'success');
   };
 
   const handleGoogleLogout = () => {
     setGoogleAccessToken(null);
     localStorage.removeItem('drive_token');
     localStorage.removeItem('drive_expires_at');
+    addNotification('Google Drive', 'Shared marketing drive has been disconnected.', 'info');
   };
 
-  const handleSaveAsset = async () => {
-    if (!assetFormData.title || !assetFormData.link) return;
-    
-    const assetToSave: Asset = {
-      id: editingAsset?.id || `asset_${Date.now()}`,
-      title: assetFormData.title,
-      category: assetFormData.category || ASSET_CATEGORIES[0],
-      link: assetFormData.link,
-      userId: user?.uid
-    };
+  const handleUpdateNotificationSettings = (settings: any) => {
+    setNotificationSettings(settings);
+    // In a real app, we would save this to Firestore user settings
+  };
 
-    try {
-      await persistenceService.saveAsset(assetToSave);
-      setIsAssetModalOpen(false);
-      setAssetFormData({ title: '', category: ASSET_CATEGORIES[0], link: '' });
-      setEditingAsset(null);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'assets');
+  const togglePinAsset = (asset: any) => {
+    const isPinned = pinnedAssets.some(p => p.id === asset.id);
+    if (isPinned) {
+      setPinnedAssets(prev => prev.filter(p => p.id !== asset.id));
+      addNotification('Unpinned', `${asset.name} removed from quick access.`, 'info');
+    } else {
+      setPinnedAssets(prev => [asset, ...prev]);
+      addNotification('Pinned', `${asset.name} added to quick access.`, 'success');
     }
   };
 
-  const handleDeleteAsset = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this asset?')) return;
-    try {
-      await persistenceService.deleteAsset(id);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, 'assets');
-    }
-  };
-
-  const handleUpdateSocialLinks = (links: any) => {
-    setSocialLinks(links);
-    // In a real app, we would save this to Firestore settings
+  const updateQuickLinks = (links: {id: string, name: string, url: string}[]) => {
+    setQuickLinks(links);
+    addNotification('Links Updated', 'Sidebar quick links have been updated.', 'success');
   };
 
   if (!isAuthReady) {
@@ -216,7 +229,13 @@ export default function App() {
           </button>
         </div>
 
-        <div className={`p-6 pt-2 flex items-center transition-all duration-500 ${isSidebarCollapsed && !isSidebarHovered ? 'justify-center' : 'gap-3'}`}>
+        <div 
+          onClick={() => {
+            setViewMode('assets');
+            setHomeResetToken(prev => prev + 1);
+          }}
+          className={`p-6 pt-2 flex items-center transition-all duration-500 cursor-pointer hover:opacity-80 ${isSidebarCollapsed && !isSidebarHovered ? 'justify-center' : 'gap-3'}`}
+        >
           <div className="relative shrink-0">
             {/* Main Square Logo */}
             <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center text-white font-bold text-xs tracking-tighter shadow-lg shadow-amber-500/20">
@@ -297,20 +316,59 @@ export default function App() {
                 exit={{ opacity: 0, height: 0 }}
                 className="pt-8 px-4 overflow-hidden"
               >
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Quick Links</h3>
-                <div className="space-y-3">
-                  <a href="#" className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors">
-                    <ExternalLink className="w-3 h-3" />
-                    Marketing Guidelines
-                  </a>
-                  <a href="#" className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors">
-                    <ExternalLink className="w-3 h-3" />
-                    Brand Voice Guide
-                  </a>
-                  <a href="#" className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors">
-                    <ExternalLink className="w-3 h-3" />
-                    Support Desk
-                  </a>
+                <div className="space-y-6">
+                  {pinnedAssets.length > 0 && (
+                    <div>
+                      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Sparkles className="w-3 h-3" />
+                        Pinned Assets
+                      </h3>
+                      <div className="space-y-2">
+                        {pinnedAssets.map(asset => {
+                          const isFolder = asset.mimeType === 'application/vnd.google-apps.folder';
+                          return (
+                            <button
+                              key={asset.id}
+                              onClick={() => {
+                                if (isFolder) {
+                                  setSelectedFolder(asset);
+                                } else {
+                                  setSelectedPreviewFile(asset);
+                                }
+                                setViewMode('assets');
+                              }}
+                              className="w-full flex items-center gap-3 text-xs text-slate-400 hover:text-white transition-all group py-1"
+                            >
+                              {isFolder ? (
+                                <Folder className="w-3 h-3 shrink-0 group-hover:text-amber-500 transition-colors" />
+                              ) : (
+                                <ExternalLink className="w-3 h-3 shrink-0 group-hover:text-amber-500 transition-colors" />
+                              )}
+                              <span className="truncate">{asset.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Quick Links</h3>
+                    <div className="space-y-3">
+                      {quickLinks.map(link => (
+                        <a 
+                          key={link.id} 
+                          href={link.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 text-xs text-slate-400 hover:text-white transition-all group py-1"
+                        >
+                          <ExternalLink className="w-3 h-3 shrink-0 group-hover:text-amber-500 transition-colors" />
+                          <span>{link.name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -344,7 +402,7 @@ export default function App() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-10">
+        <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-40">
           <h1 className="text-lg font-bold text-slate-800">
             {viewMode === 'assets' ? 'Marketing Assets' : 'Admin Center'}
           </h1>
@@ -356,50 +414,95 @@ export default function App() {
               <Plus className="w-4 h-4" />
               Request Asset
             </button>
-            {/* Social Links in Header */}
-            <div className="hidden md:flex items-center gap-3">
-              {socialLinks.facebook && (
-                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-50 rounded-lg text-[#1877F2] hover:bg-[#1877F2]/10 transition-colors">
-                  <Facebook className="w-4 h-4" />
-                </a>
-              )}
-              {socialLinks.instagram && (
-                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-50 rounded-lg text-[#E4405F] hover:bg-[#E4405F]/10 transition-colors">
-                  <Instagram className="w-4 h-4" />
-                </a>
-              )}
-              {socialLinks.linkedin && (
-                <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-50 rounded-lg text-[#0A66C2] hover:bg-[#0A66C2]/10 transition-colors">
-                  <Linkedin className="w-4 h-4" />
-                </a>
-              )}
-              {socialLinks.tiktok && (
-                <a href={socialLinks.tiktok} target="_blank" rel="noopener noreferrer" className="p-2 bg-slate-50 rounded-lg text-[#000000] hover:bg-[#000000]/10 transition-colors">
-                  <Music2 className="w-4 h-4" />
-                </a>
-              )}
-            </div>
             
-            <div className="relative" ref={notificationRef}>
-              <button 
-                onClick={() => setShowNotifications(!showNotifications)}
-                className={`relative p-2 rounded-full transition-all ${showNotifications ? 'bg-slate-100 text-amber-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-              >
-                <Bell className="w-5 h-5" />
-              </button>
-              <AnimatePresence>
-                {showNotifications && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 text-center"
-                  >
-                    <p className="text-xs text-slate-500">No new notifications</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+              <div className="relative" ref={notificationRef}>
+                <button 
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className={`relative p-2 rounded-full transition-all ${showNotifications ? 'bg-amber-100 text-amber-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Bell className="w-5 h-5" />
+                  {notifications.some(n => !n.read) && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+                  )}
+                </button>
+                <AnimatePresence>
+                  {showNotifications && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-3 w-[400px] bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 overflow-hidden flex flex-col"
+                    >
+                      <div className="flex items-center justify-between px-6 py-5 border-b border-slate-50">
+                        <h3 className="text-xl font-bold text-slate-900">Notifications</h3>
+                        <button 
+                          onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+                          className="text-[11px] text-amber-600 hover:text-amber-700 transition-colors uppercase font-bold tracking-wider"
+                        >
+                          Mark all read
+                        </button>
+                      </div>
+                      <div className="max-h-[460px] overflow-y-auto no-scrollbar">
+                        {notifications.length > 0 ? (
+                          <div className="divide-y divide-slate-50">
+                            {notifications.map(n => (
+                              <div 
+                                key={n.id} 
+                                onClick={() => {
+                                  if (n.file) {
+                                    setSelectedPreviewFile(n.file);
+                                    setViewMode('assets');
+                                    setShowNotifications(false);
+                                  }
+                                  setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, read: true } : notif));
+                                }}
+                                className={`group relative p-6 transition-all hover:bg-slate-50/80 cursor-pointer ${!n.read ? 'bg-amber-50/20' : ''}`}
+                              >
+                                {!n.read && (
+                                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400" />
+                                )}
+                                <div className="flex justify-between items-start mb-2">
+                                  <h4 className="text-[15px] font-bold text-slate-900 pr-8">{n.title}</h4>
+                                  <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap">{n.time}</span>
+                                </div>
+                                <p className="text-[13px] text-slate-500 leading-relaxed pr-6">{n.message}</p>
+                                
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setNotifications(prev => prev.filter(notif => notif.id !== n.id));
+                                  }}
+                                  className="absolute right-4 top-6 p-1.5 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-rose-50"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="py-20 text-center flex flex-col items-center gap-4">
+                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center">
+                              <Bell className="w-8 h-8 text-slate-200" />
+                            </div>
+                            <p className="text-sm font-medium text-slate-400">No new notifications</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {notifications.length > 0 && (
+                        <div className="p-4 bg-slate-50/50 border-t border-slate-100">
+                          <button 
+                            onClick={() => setNotifications([])}
+                            className="w-full py-3 text-[11px] text-slate-500 hover:text-rose-600 transition-colors uppercase font-bold tracking-widest text-center"
+                          >
+                            Clear all notifications
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
           </div>
         </header>
 
@@ -407,34 +510,56 @@ export default function App() {
           <div className="max-w-7xl mx-auto">
             {viewMode === 'assets' ? (
               <AssetsView 
-                assets={assets}
-                categoryFilter={assetCategoryFilter}
-                setCategoryFilter={setAssetCategoryFilter}
-                searchQuery={assetSearchQuery}
-                setSearchQuery={setAssetSearchQuery}
+                key={`assets-view-${homeResetToken}`}
                 googleAccessToken={googleAccessToken}
                 onGoogleLogout={handleGoogleLogout}
+                addNotification={addNotification}
+                initialPreviewFile={selectedPreviewFile}
+                onClearInitialPreview={() => setSelectedPreviewFile(null)}
+                initialFolder={selectedFolder}
+                onClearInitialFolder={() => setSelectedFolder(null)}
+                pinnedAssets={pinnedAssets}
+                onTogglePin={togglePinAsset}
               />
             ) : (
               <AdminView 
-                socialLinks={socialLinks}
-                onUpdateSocialLinks={handleUpdateSocialLinks}
-                assets={assets}
-                handleSaveAsset={handleSaveAsset}
-                handleDeleteAsset={handleDeleteAsset}
-                assetFormData={assetFormData}
-                setAssetFormData={setAssetFormData}
-                editingAsset={editingAsset}
-                setEditingAsset={setEditingAsset}
-                isAssetModalOpen={isAssetModalOpen}
-                setIsAssetModalOpen={setIsAssetModalOpen}
+                notificationSettings={notificationSettings}
+                onUpdateNotificationSettings={handleUpdateNotificationSettings}
                 googleAccessToken={googleAccessToken}
                 onGoogleAuthSuccess={handleGoogleAuthSuccess}
                 onGoogleLogout={handleGoogleLogout}
+                addNotification={addNotification}
+                quickLinks={quickLinks}
+                onUpdateQuickLinks={updateQuickLinks}
               />
             )}
           </div>
         </main>
+
+        {/* Toast Notifications */}
+        <div className="fixed bottom-8 right-8 z-[200] flex flex-col gap-3 pointer-events-none">
+          <AnimatePresence>
+            {toasts.map(toast => (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, x: 50, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 20, scale: 0.9 }}
+                className={`pointer-events-auto flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
+                  toast.type === 'success' 
+                    ? 'bg-emerald-500 text-white border-emerald-400' 
+                    : toast.type === 'error'
+                      ? 'bg-rose-500 text-white border-rose-400'
+                      : 'bg-indigo-600 text-white border-indigo-500'
+                }`}
+              >
+                {toast.type === 'success' ? <Check className="w-5 h-5" /> : 
+                 toast.type === 'error' ? <AlertCircle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
+                <p className="text-sm font-bold truncate max-w-[250px]">{toast.message}</p>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Request Asset Modal */}

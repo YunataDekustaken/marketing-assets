@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   Download, 
@@ -12,6 +12,7 @@ import {
   FileSpreadsheet, 
   FileArchive,
   Eye,
+  Pin,
   X,
   Folder,
   File as FileIcon
@@ -24,6 +25,11 @@ interface AssetGalleryProps {
   onDelete: (id: string) => void;
   onFolderClick: (folderId: string, folderName: string) => void;
   gridSize: 'list' | 'small' | 'medium' | 'large';
+  addNotification: (title: string, message: string, type?: 'info' | 'success' | 'warning', settingKey?: string, file?: any) => void;
+  initialPreviewFile?: any | null;
+  onClearInitialPreview?: () => void;
+  pinnedAssets?: any[];
+  onTogglePin?: (asset: any) => void;
 }
 
 const getFileIcon = (mimeType: string) => {
@@ -40,8 +46,26 @@ const getFileIcon = (mimeType: string) => {
   return <FileIcon className="w-10 h-10 text-slate-400" />;
 };
 
-export const AssetGallery: React.FC<AssetGalleryProps> = ({ files, loading, onDelete, onFolderClick, gridSize }) => {
+export const AssetGallery: React.FC<AssetGalleryProps> = ({ 
+  files, 
+  loading, 
+  onDelete, 
+  onFolderClick, 
+  gridSize,
+  addNotification,
+  initialPreviewFile,
+  onClearInitialPreview,
+  pinnedAssets = [],
+  onTogglePin
+}) => {
   const [previewFile, setPreviewFile] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (initialPreviewFile) {
+      setPreviewFile(initialPreviewFile);
+      onClearInitialPreview?.();
+    }
+  }, [initialPreviewFile, onClearInitialPreview]);
 
   if (loading && files.length === 0) {
     return (
@@ -96,6 +120,13 @@ export const AssetGallery: React.FC<AssetGalleryProps> = ({ files, loading, onDe
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => onTogglePin?.(file)}
+                      className={`p-1.5 transition-all rounded-lg ${pinnedAssets.some(p => p.id === file.id) ? 'text-amber-500 bg-amber-50' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                      title={pinnedAssets.some(p => p.id === file.id) ? "Unpin from sidebar" : "Pin to sidebar"}
+                    >
+                      <Pin className={`w-4 h-4 ${pinnedAssets.some(p => p.id === file.id) ? 'fill-current' : ''}`} />
+                    </button>
                     {!isFolder && (
                       <button
                         onClick={() => setPreviewFile(file)}
@@ -104,6 +135,21 @@ export const AssetGallery: React.FC<AssetGalleryProps> = ({ files, loading, onDe
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                    )}
+                    {!isFolder && (
+                      <a
+                        href={file.webContentLink || file.webViewLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                        title="Download"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addNotification('Download Started', `Started downloading: ${file.name}`, 'success', 'fileDownloads', file);
+                        }}
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
                     )}
                     <a
                       href={file.webViewLink}
@@ -170,6 +216,18 @@ export const AssetGallery: React.FC<AssetGalleryProps> = ({ files, loading, onDe
                       // For folders, we don't stop propagation so the parent's onClick (onFolderClick) fires
                     }}
                   >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTogglePin?.(file);
+                      }}
+                      className={`bg-white rounded-lg hover:bg-amber-500 transition-colors flex items-center justify-center ${
+                        gridSize === 'small' ? 'p-1.5' : 'p-2'
+                      } ${pinnedAssets.some(p => p.id === file.id) ? 'text-amber-500' : 'text-slate-900'}`}
+                      title={pinnedAssets.some(p => p.id === file.id) ? "Unpin from sidebar" : "Pin to sidebar"}
+                    >
+                      <Pin className={(gridSize === 'small' ? 'w-3.5 h-3.5 ' : 'w-4 h-4 ') + (pinnedAssets.some(p => p.id === file.id) ? 'fill-current' : '')} />
+                    </button>
                     {!isFolder && (
                       <button
                         onClick={(e) => {
@@ -221,11 +279,15 @@ export const AssetGallery: React.FC<AssetGalleryProps> = ({ files, loading, onDe
                   </div>
                   {!isFolder && gridSize !== 'small' && (
                     <a
-                      href={file.webViewLink}
-                      download
+                      href={file.webContentLink || file.webViewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
                       title="Download"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addNotification('Download Started', `Started downloading: ${file.name}`, 'success', 'fileDownloads', file);
+                      }}
                     >
                       <Download className="w-4 h-4" />
                     </a>
@@ -259,12 +321,27 @@ export const AssetGallery: React.FC<AssetGalleryProps> = ({ files, loading, onDe
                   </div>
                   <h2 className="text-lg font-bold text-slate-900 truncate">{previewFile.name}</h2>
                 </div>
-                <button 
-                  onClick={() => setPreviewFile(null)} 
-                  className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                >
-                  <X className="w-6 h-6 text-slate-500" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {previewFile.mimeType !== 'application/vnd.google-apps.folder' && (
+                    <button
+                      onClick={() => onTogglePin?.(previewFile)}
+                      className={`p-2 rounded-xl border transition-all ${
+                        pinnedAssets.some(p => p.id === previewFile.id)
+                          ? 'bg-amber-50 border-amber-200 text-amber-600'
+                          : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
+                      }`}
+                      title={pinnedAssets.some(p => p.id === previewFile.id) ? "Unpin from sidebar" : "Pin to sidebar"}
+                    >
+                      <Pin className={`w-4 h-4 ${pinnedAssets.some(p => p.id === previewFile.id) ? 'fill-current' : ''}`} />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setPreviewFile(null)} 
+                    className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                  >
+                    <X className="w-6 h-6 text-slate-500" />
+                  </button>
+                </div>
               </div>
               
               <div className="flex-1 bg-slate-100 relative">
@@ -290,8 +367,10 @@ export const AssetGallery: React.FC<AssetGalleryProps> = ({ files, loading, onDe
                     Open in Drive
                   </a>
                   <a
-                    href={previewFile.webViewLink}
-                    download
+                    href={previewFile.webContentLink || previewFile.webViewLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => addNotification('Download Started', `Started downloading: ${previewFile.name}`, 'success', 'fileDownloads', previewFile)}
                     className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl text-sm font-bold transition-all shadow-lg shadow-amber-100 flex items-center gap-2"
                   >
                     <Download className="w-4 h-4" />

@@ -1,68 +1,68 @@
-import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   AlertCircle, 
   Edit2, 
   Trash2, 
-  ExternalLink,
   X,
-  Facebook,
-  Instagram,
-  Linkedin,
   FolderOpen,
   Info,
-  Music2
+  Bell,
+  Mail,
+  Zap,
+  History,
+  ExternalLink,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Asset, ASSET_CATEGORIES } from '../types';
 import { GoogleAuth } from './GoogleAuth';
 import { Cloud, RefreshCw } from 'lucide-react';
 
 export const AdminView = ({ 
-  socialLinks,
-  onUpdateSocialLinks,
-  assets,
-  handleSaveAsset,
-  handleDeleteAsset,
-  assetFormData,
-  setAssetFormData,
-  editingAsset,
-  setEditingAsset,
-  isAssetModalOpen,
-  setIsAssetModalOpen,
+  notificationSettings,
+  onUpdateNotificationSettings,
   googleAccessToken,
   onGoogleAuthSuccess,
-  onGoogleLogout
+  onGoogleLogout,
+  addNotification,
+  quickLinks,
+  onUpdateQuickLinks
 }: { 
-  socialLinks: { facebook: string, instagram: string, linkedin: string, tiktok: string },
-  onUpdateSocialLinks: (links: any) => void,
-  assets: Asset[],
-  handleSaveAsset: () => Promise<void>,
-  handleDeleteAsset: (id: string) => Promise<void>,
-  assetFormData: Partial<Asset>,
-  setAssetFormData: Dispatch<SetStateAction<Partial<Asset>>>,
-  editingAsset: Asset | null,
-  setEditingAsset: Dispatch<SetStateAction<Asset | null>>,
-  isAssetModalOpen: boolean,
-  setIsAssetModalOpen: Dispatch<SetStateAction<boolean>>,
+  notificationSettings: { 
+    driveUploads: boolean, 
+    fileDownloads: boolean,
+    connectivityIssues: boolean, 
+    storageQuota: boolean, 
+    systemMaintenance: boolean 
+  },
+  onUpdateNotificationSettings: (settings: any) => void,
   googleAccessToken: string | null,
   onGoogleAuthSuccess: (token: string, expiresAt: number) => void,
-  onGoogleLogout: () => void
+  onGoogleLogout: () => void,
+  addNotification: (title: string, message: string, type?: 'info' | 'success' | 'warning', settingKey?: string, file?: any) => void,
+  quickLinks?: {id: string, name: string, url: string}[],
+  onUpdateQuickLinks: (links: {id: string, name: string, url: string}[]) => void
 }) => {
-  const [localLinks, setLocalLinks] = useState(socialLinks);
+  const [localSettings, setLocalSettings] = useState(notificationSettings);
+  const [localQuickLinks, setLocalQuickLinks] = useState(quickLinks || []);
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
-    setLocalLinks(socialLinks);
-  }, [socialLinks]);
+    setLocalSettings(notificationSettings);
+  }, [notificationSettings]);
 
-  const handleSaveLinks = () => {
+  useEffect(() => {
+    if (quickLinks) setLocalQuickLinks(quickLinks);
+  }, [quickLinks]);
+
+  const handleSaveSettings = () => {
     setShowConfirm(true);
   };
 
   const confirmSave = () => {
-    onUpdateSocialLinks(localLinks);
+    onUpdateNotificationSettings(localSettings);
     setShowConfirm(false);
+    addNotification('Settings Updated', 'Notification settings have been updated successfully.', 'success');
   };
 
   return (
@@ -96,144 +96,180 @@ export const AdminView = ({
         )}
       </div>
 
-      {/* Asset Management */}
-      <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-50 rounded-xl">
-              <FolderOpen className="w-6 h-6 text-amber-500" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-slate-900">Asset Library Management</h3>
-              <p className="text-xs text-slate-500">Add or remove marketing assets from the library.</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => {
-              setEditingAsset(null);
-              setAssetFormData({ title: '', category: ASSET_CATEGORIES[0], link: '' });
-              setIsAssetModalOpen(true);
-            }}
-            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-900 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add Asset
-          </button>
-        </div>
-
-        <div className="space-y-8">
-          {ASSET_CATEGORIES.map(category => {
-            const categoryAssets = assets.filter(a => a.category === category);
-            if (categoryAssets.length === 0) return null;
-            
-            return (
-              <div key={category} className="space-y-3">
-                <h4 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">{category}</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categoryAssets.map(asset => (
-                    <div key={asset.id} className="p-4 border border-slate-100 rounded-xl bg-slate-50/30 flex items-center justify-between group">
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">{asset.title}</p>
-                        <p className="text-[10px] text-slate-500">{asset.category}</p>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => {
-                            setEditingAsset(asset);
-                            setAssetFormData(asset);
-                            setIsAssetModalOpen(true);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-white rounded-lg transition-all"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteAsset(asset.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {assets.length === 0 && (
-            <div className="text-center py-8 text-slate-500 text-sm">No assets found. Add one above.</div>
-          )}
-        </div>
-      </div>
-
       <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
         <div className="flex items-center gap-4 mb-8">
           <div className="p-3 bg-indigo-50 rounded-xl">
-            <ExternalLink className="w-6 h-6 text-indigo-500" />
+            <Bell className="w-6 h-6 text-indigo-500" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900">Social Media Redirection Links</h3>
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">Notification Settings</h3>
+            <p className="text-xs text-slate-500">Configure how and when you receive portal updates.</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <Facebook className="w-3 h-3 text-[#1877F2]" />
-              Facebook URL
-            </label>
-            <input 
-              type="url" 
-              placeholder="https://facebook.com/yourpage"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all text-sm"
-              value={localLinks.facebook}
-              onChange={(e) => setLocalLinks(prev => ({ ...prev, facebook: e.target.value }))}
-            />
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <Download className="w-4 h-4 text-indigo-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">File Downloads</p>
+                <p className="text-[10px] text-slate-500">Track and notify of asset downloads</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setLocalSettings(prev => ({ ...prev, fileDownloads: !prev.fileDownloads }))}
+              className={`shrink-0 w-11 h-6 p-1 rounded-full transition-colors relative flex items-center ${localSettings.fileDownloads ? 'bg-amber-500' : 'bg-slate-300'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 transform ${localSettings.fileDownloads ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <Instagram className="w-3 h-3 text-[#E4405F]" />
-              Instagram URL
-            </label>
-            <input 
-              type="url" 
-              placeholder="https://instagram.com/yourprofile"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all text-sm"
-              value={localLinks.instagram}
-              onChange={(e) => setLocalLinks(prev => ({ ...prev, instagram: e.target.value }))}
-            />
+
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <Cloud className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">New Drive Uploads</p>
+                <p className="text-[10px] text-slate-500">Alert team when new materials appear in Drive</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setLocalSettings(prev => ({ ...prev, driveUploads: !prev.driveUploads }))}
+              className={`shrink-0 w-11 h-6 p-1 rounded-full transition-colors relative flex items-center ${localSettings.driveUploads ? 'bg-amber-500' : 'bg-slate-300'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 transform ${localSettings.driveUploads ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <Linkedin className="w-3 h-3 text-[#0A66C2]" />
-              LinkedIn URL
-            </label>
-            <input 
-              type="url" 
-              placeholder="https://linkedin.com/company/yourcompany"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all text-sm"
-              value={localLinks.linkedin}
-              onChange={(e) => setLocalLinks(prev => ({ ...prev, linkedin: e.target.value }))}
-            />
+
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <RefreshCw className="w-4 h-4 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">Connectivity Issues</p>
+                <p className="text-[10px] text-slate-500">Notify when Google Drive token expires</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setLocalSettings(prev => ({ ...prev, connectivityIssues: !prev.connectivityIssues }))}
+              className={`shrink-0 w-11 h-6 p-1 rounded-full transition-colors relative flex items-center ${localSettings.connectivityIssues ? 'bg-amber-500' : 'bg-slate-300'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 transform ${localSettings.connectivityIssues ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <Music2 className="w-3 h-3 text-[#000000]" />
-              TikTok URL
-            </label>
-            <input 
-              type="url" 
-              placeholder="https://tiktok.com/@yourprofile"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all text-sm"
-              value={localLinks.tiktok}
-              onChange={(e) => setLocalLinks(prev => ({ ...prev, tiktok: e.target.value }))}
-            />
+
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <AlertCircle className="w-4 h-4 text-rose-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">Storage & Quota</p>
+                <p className="text-[10px] text-slate-500">Alert when shared drive storage is low</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setLocalSettings(prev => ({ ...prev, storageQuota: !prev.storageQuota }))}
+              className={`shrink-0 w-11 h-6 p-1 rounded-full transition-colors relative flex items-center ${localSettings.storageQuota ? 'bg-amber-500' : 'bg-slate-300'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 transform ${localSettings.storageQuota ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <Zap className="w-4 h-4 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">System Maintenance</p>
+                <p className="text-[10px] text-slate-500">Maintenance & version updates</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setLocalSettings(prev => ({ ...prev, systemMaintenance: !prev.systemMaintenance }))}
+              className={`shrink-0 w-11 h-6 p-1 rounded-full transition-colors relative flex items-center ${localSettings.systemMaintenance ? 'bg-amber-500' : 'bg-slate-300'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 transform ${localSettings.systemMaintenance ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
           </div>
         </div>
 
         <button 
-          onClick={handleSaveLinks}
+          onClick={handleSaveSettings}
           className="px-8 py-3 bg-amber-500 hover:bg-amber-600 text-primary-dark rounded-xl text-sm font-bold transition-all shadow-sm"
         >
-          Save Social Links
+          Save Notification Settings
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <ExternalLink className="w-6 h-6 text-slate-500" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900">Quick Links Management</h3>
+        </div>
+        
+        <div className="space-y-4">
+          {localQuickLinks.map((link, index) => (
+            <div key={link.id} className="flex flex-col md:flex-row gap-4 items-end p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <div className="flex-1 w-full space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Link Name</label>
+                <input 
+                  type="text" 
+                  value={link.name}
+                  onChange={(e) => {
+                    const newLinks = [...localQuickLinks];
+                    newLinks[index].name = e.target.value;
+                    setLocalQuickLinks(newLinks);
+                  }}
+                  placeholder="e.g. Brand Guidelines"
+                  className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                />
+              </div>
+              <div className="flex-[2] w-full space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">URL</label>
+                <input 
+                  type="text" 
+                  value={link.url}
+                  onChange={(e) => {
+                    const newLinks = [...localQuickLinks];
+                    newLinks[index].url = e.target.value;
+                    setLocalQuickLinks(newLinks);
+                  }}
+                  placeholder="https://..."
+                  className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                />
+              </div>
+              <button 
+                onClick={() => setLocalQuickLinks(prev => prev.filter((_, i) => i !== index))}
+                className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                title="Remove Link"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+          ))}
+          
+          <button 
+            onClick={() => setLocalQuickLinks(prev => [...prev, { id: Date.now().toString(), name: '', url: '#' }])}
+            className="w-full py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-amber-600 hover:border-amber-200 hover:bg-amber-50/30 transition-all flex items-center justify-center gap-2 group"
+          >
+            <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            <span className="text-sm font-bold tracking-tight">Add New Link</span>
+          </button>
+        </div>
+        
+        <button 
+          onClick={() => onUpdateQuickLinks(localQuickLinks)}
+          className="mt-8 px-8 py-3 bg-amber-500 hover:bg-amber-600 text-primary-dark rounded-xl text-sm font-bold transition-all shadow-sm"
+        >
+          Update Quick Links
         </button>
       </div>
 
@@ -246,10 +282,30 @@ export const AdminView = ({
         </div>
 
         <div className="space-y-6">
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Application Name</p>
-            <p className="text-sm font-bold text-slate-900">Marketing Operations Portal</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Application Name</p>
+              <p className="text-sm font-bold text-slate-900">Marketing Operations Portal</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Google Drive Root ID</p>
+              <div className="flex items-center gap-3">
+                <p className="text-sm font-mono font-medium text-slate-600 bg-slate-50 px-2 py-1 rounded inline-block break-all">
+                  1MWfdDx8uR55IKsgo9Y741BuxR-EJoesU
+                </p>
+                <a 
+                  href="https://drive.google.com/drive/folders/1MWfdDx8uR55IKsgo9Y741BuxR-EJoesU" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-1 px-2 text-blue-500 hover:bg-blue-50 rounded transition-colors text-[10px] uppercase font-bold border border-blue-100 flex items-center gap-1 shrink-0"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Open Root
+                </a>
+              </div>
+            </div>
           </div>
+          
           <div className="pt-6 border-t border-slate-100">
             <p className="text-xs italic text-slate-400">Admin Center is only accessible to Marketing Supervisors.</p>
           </div>
@@ -273,7 +329,7 @@ export const AdminView = ({
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">Confirm Changes</h3>
-                    <p className="text-sm text-slate-500">Are you sure you want to update the social media redirection links?</p>
+                    <p className="text-sm text-slate-500">Are you sure you want to update your notification preferences?</p>
                   </div>
                 </div>
               </div>
@@ -286,67 +342,6 @@ export const AdminView = ({
         )}
       </AnimatePresence>
 
-      {/* Asset Modal */}
-      <AnimatePresence>
-        {isAssetModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary-dark/40 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                <h2 className="text-lg font-bold text-slate-900">{editingAsset ? 'Edit Asset' : 'Add New Asset'}</h2>
-                <button onClick={() => setIsAssetModalOpen(false)} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
-                  <X className="w-5 h-5 text-slate-500" />
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Asset Name</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                    value={assetFormData.title}
-                    onChange={(e) => setAssetFormData(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="e.g. Primary Logo Kit"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Category</label>
-                  <select 
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                    value={assetFormData.category}
-                    onChange={(e) => setAssetFormData(prev => ({ ...prev, category: e.target.value }))}
-                  >
-                    {ASSET_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Google Drive Link</label>
-                  <input 
-                    type="url" 
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                    value={assetFormData.link}
-                    onChange={(e) => setAssetFormData(prev => ({ ...prev, link: e.target.value }))}
-                    placeholder="https://drive.google.com/..."
-                  />
-                </div>
-              </div>
-              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button onClick={() => setIsAssetModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
-                <button 
-                  onClick={handleSaveAsset}
-                  className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-primary-dark text-sm font-bold rounded-lg transition-colors shadow-sm"
-                >
-                  {editingAsset ? 'Update Asset' : 'Add Asset'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
