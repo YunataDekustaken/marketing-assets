@@ -24,10 +24,11 @@ import {
   PanelLeftOpen,
   FolderOpen,
   Folder,
-  Sparkles
+  Sparkles,
+  ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ViewMode } from './types';
+import { ViewMode, RequestItem, INITIAL_REQUESTS } from './types';
 import { auth, db, googleProvider, isFirebaseConfigured } from './firebase';
 import { 
   onAuthStateChanged, 
@@ -43,6 +44,7 @@ import { persistenceService } from './services/persistenceService';
 
 import { AdminView } from './components/AdminView';
 import { AssetsView } from './components/AssetsView';
+import { RequestsView } from './components/RequestsView';
 import { ROOT_FOLDER_ID } from './hooks/useGoogleDrive';
 
 enum OperationType {
@@ -66,6 +68,7 @@ export default function App() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [assetRequests, setAssetRequests] = useState<RequestItem[]>(INITIAL_REQUESTS);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [toasts, setToasts] = useState<{id: string, message: string, type: 'success' | 'info' | 'error'}[]>([]);
   const [selectedPreviewFile, setSelectedPreviewFile] = useState<any | null>(null);
@@ -83,7 +86,8 @@ export default function App() {
     fileDownloads: true,
     connectivityIssues: true,
     storageQuota: false,
-    systemMaintenance: true
+    systemMaintenance: true,
+    assetRequests: true
   });
 
   const addNotification = (
@@ -183,6 +187,11 @@ export default function App() {
     addNotification('Google Drive', 'Shared marketing drive has been disconnected.', 'info');
   };
 
+  const updateRequestStatus = (id: string, newStatus: 'pending' | 'approved' | 'rejected') => {
+    setAssetRequests(prev => prev.map(req => req.id === id ? { ...req, status: newStatus } : req));
+    addNotification('Status Updated', `Request status changed to ${newStatus}.`, 'success', 'assetRequests');
+  };
+
   const handleUpdateNotificationSettings = (settings: any) => {
     setNotificationSettings(settings);
     // In a real app, we would save this to Firestore user settings
@@ -280,6 +289,26 @@ export default function App() {
                   className="whitespace-nowrap overflow-hidden"
                 >
                   Assets Library
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+
+          <button 
+            onClick={() => setViewMode('requests')}
+            className={`w-full flex items-center ${isSidebarCollapsed && !isSidebarHovered ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl font-semibold transition-all duration-300 ease-in-out ${viewMode === 'requests' ? 'bg-slate-700/50 text-amber-500 border-l-4 border-amber-500' : 'hover:bg-white/10 hover:text-white text-slate-400'}`}
+          >
+            <ClipboardList className="w-5 h-5 shrink-0" />
+            <AnimatePresence>
+              {(!isSidebarCollapsed || isSidebarHovered) && (
+                <motion.span 
+                  key="requests-text"
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="whitespace-nowrap overflow-hidden"
+                >
+                  Asset Requests
                 </motion.span>
               )}
             </AnimatePresence>
@@ -404,7 +433,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-40">
           <h1 className="text-lg font-bold text-slate-800">
-            {viewMode === 'assets' ? 'Marketing Assets' : 'Admin Center'}
+            {viewMode === 'assets' ? 'Marketing Assets' : viewMode === 'requests' ? 'Asset Requests' : 'Admin Center'}
           </h1>
           <div className="flex items-center gap-6">
             <button
@@ -521,6 +550,12 @@ export default function App() {
                 pinnedAssets={pinnedAssets}
                 onTogglePin={togglePinAsset}
               />
+            ) : viewMode === 'requests' ? (
+              <RequestsView 
+                requests={assetRequests} 
+                hasAdminAccess={!!googleAccessToken}
+                onStatusChange={updateRequestStatus}
+              />
             ) : (
               <AdminView 
                 notificationSettings={notificationSettings}
@@ -581,7 +616,19 @@ export default function App() {
               <form 
                 onSubmit={(e) => {
                   e.preventDefault();
-                  alert('✅ Request submitted! Marketing team will review and add the asset soon.');
+                  
+                  const formData = new FormData(e.currentTarget);
+                  const newRequest: RequestItem = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    name: formData.get('name') as string,
+                    department: formData.get('department') as string,
+                    asset: formData.get('asset') as string,
+                    status: 'pending',
+                    date: new Date().toISOString().split('T')[0]
+                  };
+                  
+                  setAssetRequests(prev => [newRequest, ...prev]);
+                  addNotification('Request Submitted', 'Marketing team will review and add the asset soon.', 'success', 'assetRequests');
                   setIsRequestModalOpen(false);
                 }}
               >
@@ -590,6 +637,7 @@ export default function App() {
                     <label className="text-xs font-bold text-slate-500 uppercase">Your Name</label>
                     <input 
                       required
+                      name="name"
                       type="text" 
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
                       placeholder="John Doe"
@@ -599,6 +647,7 @@ export default function App() {
                     <label className="text-xs font-bold text-slate-500 uppercase">Department</label>
                     <select 
                       required
+                      name="department"
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
                     >
                       <option value="">Select...</option>
@@ -612,6 +661,7 @@ export default function App() {
                     <label className="text-xs font-bold text-slate-500 uppercase">Requested Asset</label>
                     <input 
                       required
+                      name="asset"
                       type="text" 
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
                       placeholder="e.g. Holiday campaign banner"

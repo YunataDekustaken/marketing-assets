@@ -12,7 +12,8 @@ import {
   Zap,
   History,
   ExternalLink,
-  Download
+  Download,
+  ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleAuth } from './GoogleAuth';
@@ -33,7 +34,8 @@ export const AdminView = ({
     fileDownloads: boolean,
     connectivityIssues: boolean, 
     storageQuota: boolean, 
-    systemMaintenance: boolean 
+    systemMaintenance: boolean,
+    assetRequests: boolean 
   },
   onUpdateNotificationSettings: (settings: any) => void,
   googleAccessToken: string | null,
@@ -195,6 +197,24 @@ export const AdminView = ({
               className={`shrink-0 w-11 h-6 p-1 rounded-full transition-colors relative flex items-center ${localSettings.systemMaintenance ? 'bg-amber-500' : 'bg-slate-300'}`}
             >
               <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 transform ${localSettings.systemMaintenance ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <ClipboardList className="w-4 h-4 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">Asset Requests</p>
+                <p className="text-[10px] text-slate-500">Alerts for new or updated asset requests</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setLocalSettings(prev => ({ ...prev, assetRequests: !prev.assetRequests }))}
+              className={`shrink-0 w-11 h-6 p-1 rounded-full transition-colors relative flex items-center ${localSettings.assetRequests ? 'bg-amber-500' : 'bg-slate-300'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 transform ${localSettings.assetRequests ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>

@@ -3,7 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type ViewMode = 'assets' | 'admin';
+export type ViewMode = 'assets' | 'admin' | 'requests';
+
+export interface RequestItem {
+  id: string;
+  name: string;
+  department: string;
+  asset: string;
+  status: 'pending' | 'approved' | 'rejected';
+  date: string;
+}
+
+export const INITIAL_REQUESTS: RequestItem[] = [
+  { id: '1', name: 'John Doe', department: 'Sales', asset: 'Q3 Sales Deck Template', status: 'pending', date: '2024-05-15' },
+  { id: '2', name: 'Jane Smith', department: 'Engineering', asset: 'Product Architecture Icons', status: 'approved', date: '2024-05-10' },
+  { id: '3', name: 'Alice Cooper', department: 'Customer Success', asset: 'Onboarding Checklist PDF', status: 'rejected', date: '2024-05-02' }
+];
 
 export interface Asset {
   id: string;
