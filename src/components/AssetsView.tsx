@@ -106,10 +106,8 @@ export const AssetsView = ({
   };
 
   useEffect(() => {
-    if (googleAccessToken) {
-      fetchFiles();
-    }
-  }, [googleAccessToken, fetchFiles, currentFolder.id]);
+    fetchFiles();
+  }, [fetchFiles, currentFolder.id]);
 
   const handleFolderClick = (folderId: string, folderName: string) => {
     setFolderStack(prev => [...prev, { id: folderId, name: folderName }]);
@@ -136,129 +134,113 @@ export const AssetsView = ({
           exit={{ opacity: 0, y: -10 }}
           className="space-y-6"
         >
-            <div className="flex flex-col md:flex-row gap-6 items-start justify-between">
-              <div className="space-y-2">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            
+            {/* Left side: Heading, Subtitle, and Breadcrumbs */}
+            <div className="flex flex-col gap-4">
+              <div className="space-y-1">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold text-slate-900">Google Drive Assets</h2>
-                  {googleAccessToken && (
-                    <div className="flex items-center gap-1">
-                      <button 
-                        onClick={() => fetchFiles()}
-                        disabled={loading}
-                        className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all disabled:opacity-50"
-                        title="Refresh files"
-                      >
-                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                      </button>
-                      <a 
-                        href={`https://drive.google.com/drive/folders/1MWfdDx8uR55IKsgo9Y741BuxR-EJoesU`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                        title="Open Folder in Drive"
-                      >
-                        <ExternalLink className="w-5 h-5" />
-                      </a>
-                    </div>
-                  )}
+                  <h2 className="text-2xl font-bold text-slate-900 whitespace-nowrap">Google Drive Assets</h2>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => fetchFiles()}
+                      disabled={loading}
+                      className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all disabled:opacity-50"
+                      title="Refresh files"
+                    >
+                      <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <a 
+                      href={`https://drive.google.com/drive/folders/1MWfdDx8uR55IKsgo9Y741BuxR-EJoesU`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                      title="Open Folder in Drive"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                    </a>
+                  </div>
                 </div>
                 <p className="text-slate-500 text-sm">Manage files directly in your shared marketing folder.</p>
               </div>
 
-              {googleAccessToken && (
-                <div className="shrink-0">
-                  <UploadZone onUpload={uploadFile} loading={loading} isSmall />
-                </div>
-              )}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                {folderStack.map((folder, index) => (
+                  <React.Fragment key={folder.id}>
+                    {index > 0 && <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />}
+                    <button
+                      onClick={() => navigateToBreadcrumb(index)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
+                        index === folderStack.length - 1
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      {index === 0 ? <Home className="w-4 h-4" /> : <FolderOpen className="w-4 h-4" />}
+                      {folder.name}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
 
-            {googleAccessToken ? (
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div className="flex flex-col md:flex-row md:items-center gap-4 py-1">
-                    {/* Breadcrumbs */}
-                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-                      {folderStack.map((folder, index) => (
-                        <React.Fragment key={folder.id}>
-                          {index > 0 && <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />}
-                          <button
-                            onClick={() => navigateToBreadcrumb(index)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
-                              index === folderStack.length - 1
-                                ? 'bg-amber-50 text-amber-700'
-                                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-                            }`}
-                          >
-                            {index === 0 ? <Home className="w-4 h-4" /> : <FolderOpen className="w-4 h-4" />}
-                            {folder.name}
-                          </button>
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-row items-center gap-3 shrink-0">
-                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm font-medium text-slate-600 focus-within:ring-2 focus-within:ring-amber-500/50 transition-all w-fit">
-                      <ArrowUpDown className="w-4 h-4 text-slate-400" />
-                      <select 
-                        value={sortOption}
-                        onChange={(e) => setSortOption(e.target.value)}
-                        className="bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer appearance-none pr-4"
-                      >
-                        <option value="name-asc">Name (A-Z)</option>
-                        <option value="name-desc">Name (Z-A)</option>
-                        <option value="date-desc">Newest First</option>
-                        <option value="date-asc">Oldest First</option>
-                        <option value="size-desc">Largest First</option>
-                        <option value="size-asc">Smallest First</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-                      {(['list', 'small', 'medium', 'large'] as const).map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => setGridSize(size)}
-                          className={`p-2 rounded-lg transition-all relative group ${
-                            gridSize === size 
-                              ? 'bg-white text-slate-900 shadow-sm' 
-                              : 'text-slate-500 hover:text-slate-700'
-                          }`}
-                        >
-                          {gridSizeIcons[size]}
-                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                            {size.charAt(0).toUpperCase() + size.slice(1)} View
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+            {/* Right side: Upload and view controls */}
+            <div className="flex flex-col items-end gap-3 shrink-0">
+              {googleAccessToken && <UploadZone onUpload={uploadFile} loading={loading} isSmall />}
+              <div className="flex flex-row items-center gap-3 w-fit">
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm font-medium text-slate-600 focus-within:ring-2 focus-within:ring-amber-500/50 transition-all w-fit">
+                  <ArrowUpDown className="w-4 h-4 text-slate-400" />
+                  <select 
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value)}
+                    className="bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer appearance-none pr-4"
+                  >
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                    <option value="date-desc">Newest First</option>
+                    <option value="date-asc">Oldest First</option>
+                    <option value="size-desc">Largest First</option>
+                    <option value="size-asc">Smallest First</option>
+                  </select>
                 </div>
 
-                <div className="space-y-8">
-                  <AssetGallery 
-                    files={sortedFiles} 
-                    loading={loading} 
-                    onDelete={deleteFile} 
-                    onFolderClick={handleFolderClick}
-                    gridSize={gridSize}
-                    addNotification={addNotification}
-                    initialPreviewFile={initialPreviewFile}
-                    onClearInitialPreview={onClearInitialPreview}
-                    pinnedAssets={pinnedAssets}
-                    onTogglePin={onTogglePin}
-                  />
+                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+                  {(['list', 'small', 'medium', 'large'] as const).map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => setGridSize(size)}
+                      className={`p-2 rounded-lg transition-all relative group ${
+                        gridSize === size 
+                          ? 'bg-white text-slate-900 shadow-sm' 
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {gridSizeIcons[size]}
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                        {size.charAt(0).toUpperCase() + size.slice(1)} View
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
-            ) : (
-              <div className="bg-white rounded-3xl p-20 text-center border border-slate-100 shadow-sm">
-                <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Cloud className="w-10 h-10 text-indigo-400" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Google Drive Not Connected</h3>
-                <p className="text-slate-500 mb-8 max-w-md mx-auto">Please go to the Admin Center to connect your Google Drive account and access shared assets.</p>
-              </div>
-            )}
+            </div>
+          </div>
+
+          <div className="space-y-8">
+            <AssetGallery 
+              files={sortedFiles} 
+              loading={loading} 
+              onDelete={deleteFile} 
+              onFolderClick={handleFolderClick}
+              gridSize={gridSize}
+              addNotification={addNotification}
+              initialPreviewFile={initialPreviewFile}
+              onClearInitialPreview={onClearInitialPreview}
+              pinnedAssets={pinnedAssets}
+              onTogglePin={onTogglePin}
+              hasAdminAccess={!!googleAccessToken}
+            />
+          </div>
           </motion.div>
       </AnimatePresence>
     </div>

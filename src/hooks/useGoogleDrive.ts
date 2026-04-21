@@ -13,20 +13,22 @@ export const useGoogleDrive = (
   const [error, setError] = useState<string | null>(null);
 
   const fetchFiles = useCallback(async () => {
-    if (!accessToken) return;
     setLoading(true);
     setError(null);
     try {
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch(
         `https://www.googleapis.com/drive/v3/files?q='${currentFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink,modifiedTime,size)&key=${API_KEY}`,
         {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers,
         }
       );
       
-      if (response.status === 401) {
+      if (response.status === 401 && accessToken) {
         onUnauthorized?.();
         throw new Error('Session expired. Please reconnect to Google Drive.');
       }

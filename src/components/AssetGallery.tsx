@@ -30,6 +30,7 @@ interface AssetGalleryProps {
   onClearInitialPreview?: () => void;
   pinnedAssets?: any[];
   onTogglePin?: (asset: any) => void;
+  hasAdminAccess?: boolean;
 }
 
 const getFileIcon = (mimeType: string) => {
@@ -56,7 +57,8 @@ export const AssetGallery: React.FC<AssetGalleryProps> = ({
   initialPreviewFile,
   onClearInitialPreview,
   pinnedAssets = [],
-  onTogglePin
+  onTogglePin,
+  hasAdminAccess
 }) => {
   const [previewFile, setPreviewFile] = useState<any | null>(null);
 
@@ -78,231 +80,285 @@ export const AssetGallery: React.FC<AssetGalleryProps> = ({
 
   const gridClasses = {
     list: "flex flex-col gap-2",
-    small: "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4",
-    medium: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
-    large: "grid grid-cols-1 md:grid-cols-2 gap-8"
+    small: "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4",
+    medium: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6",
+    large: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8"
   };
 
-  return (
-    <div className="space-y-6">
-      <div className={gridClasses[gridSize]}>
-        <AnimatePresence mode="popLayout">
-          {files.map((file) => {
-            const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
-            
-            if (gridSize === 'list') {
-              return (
-                <motion.div
-                  key={file.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  className={`bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all flex items-center justify-between group ${isFolder ? 'cursor-pointer' : ''}`}
-                  onClick={() => isFolder && onFolderClick(file.id, file.name)}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div 
-                      className={`w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center flex-shrink-0 ${!isFolder ? 'cursor-pointer hover:bg-slate-100 transition-colors' : ''}`}
-                      onClick={(e) => {
-                        if (!isFolder) {
-                          e.stopPropagation();
-                          setPreviewFile(file);
-                        }
-                      }}
-                    >
-                      {isFolder ? <Folder className="w-5 h-5 text-amber-400" /> : getFileIcon(file.mimeType)}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-bold text-slate-900 truncate" title={file.name}>{file.name}</h3>
-                      <p className="text-[10px] text-slate-500 uppercase font-medium">
-                        {isFolder ? 'Folder' : (file.name.split('.').pop() || file.mimeType.split('/').pop() || 'File')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => onTogglePin?.(file)}
-                      className={`p-1.5 transition-all rounded-lg ${pinnedAssets.some(p => p.id === file.id) ? 'text-amber-500 bg-amber-50' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
-                      title={pinnedAssets.some(p => p.id === file.id) ? "Unpin from sidebar" : "Pin to sidebar"}
-                    >
-                      <Pin className={`w-4 h-4 ${pinnedAssets.some(p => p.id === file.id) ? 'fill-current' : ''}`} />
-                    </button>
-                    {!isFolder && (
-                      <button
-                        onClick={() => setPreviewFile(file)}
-                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                        title="Preview"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    )}
-                    {!isFolder && (
-                      <a
-                        href={file.webContentLink || file.webViewLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                        title="Download"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addNotification('Download Started', `Started downloading: ${file.name}`, 'success', 'fileDownloads', file);
-                        }}
-                      >
-                        <Download className="w-4 h-4" />
-                      </a>
-                    )}
-                    <a
-                      href={file.webViewLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                      title="View in Drive"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                    <button
-                      onClick={() => onDelete(file.id)}
-                      className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </motion.div>
-              );
-            }
+  const folders = files.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
+  const standardFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder');
 
-            return (
-              <motion.div
-                key={file.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all group flex flex-col ${isFolder ? 'cursor-pointer' : ''}`}
-                onClick={() => isFolder && onFolderClick(file.id, file.name)}
-              >
-                <div 
-                  className={`w-full bg-slate-50 rounded-xl mb-4 overflow-hidden flex items-center justify-center relative flex-shrink-0 ${
-                    gridSize === 'small' ? 'h-24' : 'aspect-video'
-                  } ${!isFolder ? 'cursor-pointer' : ''}`}
-                  onClick={(e) => {
-                    if (!isFolder) {
-                      e.stopPropagation();
-                      setPreviewFile(file);
-                    }
-                  }}
-                >
-                  {file.thumbnailLink && !isFolder ? (
-                    <img
-                      src={file.thumbnailLink.replace('=s220', gridSize === 'large' ? '=s800' : '=s400')}
-                      alt={file.name}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      {getFileIcon(file.mimeType)}
-                    </div>
-                  )}
-                  
-                  {/* Overlay */}
-                  <div 
-                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10" 
-                    onClick={(e) => {
-                      if (!isFolder) {
-                        e.stopPropagation();
-                        setPreviewFile(file);
-                      }
-                      // For folders, we don't stop propagation so the parent's onClick (onFolderClick) fires
-                    }}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTogglePin?.(file);
-                      }}
-                      className={`bg-white rounded-lg hover:bg-amber-500 transition-colors flex items-center justify-center ${
-                        gridSize === 'small' ? 'p-1.5' : 'p-2'
-                      } ${pinnedAssets.some(p => p.id === file.id) ? 'text-amber-500' : 'text-slate-900'}`}
-                      title={pinnedAssets.some(p => p.id === file.id) ? "Unpin from sidebar" : "Pin to sidebar"}
-                    >
-                      <Pin className={(gridSize === 'small' ? 'w-3.5 h-3.5 ' : 'w-4 h-4 ') + (pinnedAssets.some(p => p.id === file.id) ? 'fill-current' : '')} />
-                    </button>
-                    {!isFolder && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewFile(file);
-                        }}
-                        className={`bg-white rounded-lg text-slate-900 hover:bg-amber-500 transition-colors flex items-center justify-center ${
-                          gridSize === 'small' ? 'p-1.5' : 'p-2'
-                        }`}
-                        title="Preview"
-                      >
-                        <Eye className={gridSize === 'small' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-                      </button>
-                    )}
-                    <a
-                      href={file.webViewLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className={`bg-white rounded-lg text-slate-900 hover:bg-amber-500 transition-colors flex items-center justify-center ${
-                        gridSize === 'small' ? 'p-1.5' : 'p-2'
-                      }`}
-                      title="View in Drive"
-                    >
-                      <ExternalLink className={gridSize === 'small' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-                    </a>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(file.id);
-                      }}
-                      className={`bg-white rounded-lg text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center ${
-                        gridSize === 'small' ? 'p-1.5' : 'p-2'
-                      }`}
-                      title="Delete"
-                    >
-                      <Trash2 className={gridSize === 'small' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className={`font-bold text-slate-900 truncate ${gridSize === 'small' ? 'text-xs' : 'text-sm'}`} title={file.name}>
-                      {file.name}
-                    </h3>
-                    <p className="text-[10px] text-slate-500 uppercase font-medium">
-                      {isFolder ? 'Folder' : (file.name.split('.').pop() || file.mimeType.split('/').pop() || 'File')}
-                    </p>
-                  </div>
-                  {!isFolder && gridSize !== 'small' && (
-                    <a
-                      href={file.webContentLink || file.webViewLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                      title="Download"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addNotification('Download Started', `Started downloading: ${file.name}`, 'success', 'fileDownloads', file);
-                      }}
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-        {files.length === 0 && !loading && (
-          <div className="col-span-full py-20 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-            <p className="text-slate-400 font-medium">No files found in this folder.</p>
-          </div>
+  const renderListItem = (file: any, isFolder: boolean) => (
+    <motion.div
+      key={file.id}
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 10 }}
+      className={`bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all flex items-center justify-between group ${isFolder ? 'cursor-pointer' : ''}`}
+      onClick={() => isFolder && onFolderClick(file.id, file.name)}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div 
+          className={`w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center flex-shrink-0 ${!isFolder ? 'cursor-pointer hover:bg-slate-100 transition-colors' : ''}`}
+          onClick={(e) => {
+            if (!isFolder) {
+              e.stopPropagation();
+              setPreviewFile(file);
+            }
+          }}
+        >
+          {isFolder ? <Folder className="w-5 h-5 text-amber-400" /> : getFileIcon(file.mimeType)}
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-slate-900 truncate" title={file.name}>{file.name}</h3>
+          <p className="text-[10px] text-slate-500 uppercase font-medium">
+            {isFolder ? 'Folder' : (file.name.split('.').pop() || file.mimeType.split('/').pop() || 'File')}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => onTogglePin?.(file)}
+          className={`p-1.5 transition-all rounded-lg ${pinnedAssets.some(p => p.id === file.id) ? 'text-amber-500 bg-amber-50' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
+          title={pinnedAssets.some(p => p.id === file.id) ? "Unpin from sidebar" : "Pin to sidebar"}
+        >
+          <Pin className={`w-4 h-4 ${pinnedAssets.some(p => p.id === file.id) ? 'fill-current' : ''}`} />
+        </button>
+        {!isFolder && (
+          <button
+            onClick={() => setPreviewFile(file)}
+            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+            title="Preview"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+        )}
+        {!isFolder && (
+          <a
+            href={file.webContentLink || file.webViewLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+            title="Download"
+            onClick={(e) => {
+              e.stopPropagation();
+              addNotification('Download Started', `Started downloading: ${file.name}`, 'success', 'fileDownloads', file);
+            }}
+          >
+            <Download className="w-4 h-4" />
+          </a>
+        )}
+        <a
+          href={file.webViewLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+          title="View in Drive"
+        >
+          <ExternalLink className="w-4 h-4" />
+        </a>
+        {hasAdminAccess && (
+          <button
+            onClick={() => onDelete(file.id)}
+            className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         )}
       </div>
+    </motion.div>
+  );
+
+  const renderFolderGridItem = (folder: any) => (
+    <motion.div
+      key={folder.id}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer flex items-center justify-between group"
+      onClick={() => onFolderClick(folder.id, folder.name)}
+    >
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <Folder className="w-6 h-6 text-amber-500 fill-current flex-shrink-0" />
+        <h3 className="text-sm font-bold text-slate-700 truncate" title={folder.name}>{folder.name}</h3>
+      </div>
+      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+         <button
+          onClick={() => onTogglePin?.(folder)}
+          className={`p-1.5 transition-all rounded-lg ${pinnedAssets.some(p => p.id === folder.id) ? 'text-amber-500 bg-amber-50' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
+          title={pinnedAssets.some(p => p.id === folder.id) ? "Unpin from sidebar" : "Pin to sidebar"}
+        >
+          <Pin className={`w-3.5 h-3.5 ${pinnedAssets.some(p => p.id === folder.id) ? 'fill-current' : ''}`} />
+        </button>
+        {hasAdminAccess && (
+          <button
+            onClick={() => onDelete(folder.id)}
+            className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+            title="Delete"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+
+  const renderFileGridItem = (file: any) => (
+    <motion.div
+      key={file.id}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="bg-white p-2 pb-3 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all group flex flex-col"
+    >
+      <div 
+        className={`w-full bg-slate-50 rounded-xl mb-2 overflow-hidden flex items-center justify-center relative flex-shrink-0 cursor-pointer ${
+          gridSize === 'small' ? 'h-24' : 'aspect-video'
+        }`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setPreviewFile(file);
+        }}
+      >
+        {file.thumbnailLink ? (
+          <img
+            src={file.thumbnailLink.replace('=s220', gridSize === 'large' ? '=s800' : '=s400')}
+            alt={file.name}
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            {getFileIcon(file.mimeType)}
+          </div>
+        )}
+        
+        {/* Overlay */}
+        <div 
+          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10" 
+          onClick={(e) => {
+            e.stopPropagation();
+            setPreviewFile(file);
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin?.(file);
+            }}
+            className={`bg-white rounded-lg hover:bg-amber-500 transition-colors flex items-center justify-center ${
+              gridSize === 'small' ? 'p-1.5' : 'p-2'
+            } ${pinnedAssets.some(p => p.id === file.id) ? 'text-amber-500' : 'text-slate-900'}`}
+            title={pinnedAssets.some(p => p.id === file.id) ? "Unpin from sidebar" : "Pin to sidebar"}
+          >
+            <Pin className={(gridSize === 'small' ? 'w-3.5 h-3.5 ' : 'w-4 h-4 ') + (pinnedAssets.some(p => p.id === file.id) ? 'fill-current' : '')} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewFile(file);
+            }}
+            className={`bg-white rounded-lg text-slate-900 hover:bg-amber-500 transition-colors flex items-center justify-center ${
+              gridSize === 'small' ? 'p-1.5' : 'p-2'
+            }`}
+            title="Preview"
+          >
+            <Eye className={gridSize === 'small' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+          </button>
+          <a
+            href={file.webViewLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className={`bg-white rounded-lg text-slate-900 hover:bg-amber-500 transition-colors flex items-center justify-center ${
+              gridSize === 'small' ? 'p-1.5' : 'p-2'
+            }`}
+            title="View in Drive"
+          >
+            <ExternalLink className={gridSize === 'small' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+          </a>
+          {hasAdminAccess && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(file.id);
+              }}
+              className={`bg-white rounded-lg text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center ${
+                gridSize === 'small' ? 'p-1.5' : 'p-2'
+              }`}
+              title="Delete"
+            >
+              <Trash2 className={gridSize === 'small' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex items-start justify-between gap-2 px-2">
+        <div className="min-w-0">
+          <h3 className={`font-bold text-slate-900 truncate ${gridSize === 'small' ? 'text-xs' : 'text-sm'}`} title={file.name}>
+            {file.name}
+          </h3>
+          <p className="text-[10px] text-slate-500 uppercase font-medium">
+            {file.name.split('.').pop() || file.mimeType.split('/').pop() || 'File'}
+          </p>
+        </div>
+        {gridSize !== 'small' && (
+          <a
+            href={file.webContentLink || file.webViewLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all flex-shrink-0"
+            title="Download"
+            onClick={(e) => {
+              e.stopPropagation();
+              addNotification('Download Started', `Started downloading: ${file.name}`, 'success', 'fileDownloads', file);
+            }}
+          >
+            <Download className="w-4 h-4" />
+          </a>
+        )}
+      </div>
+    </motion.div>
+  );
+
+  return (
+    <div className="space-y-8">
+      {gridSize === 'list' && files.length > 0 && (
+        <div className={gridClasses['list']}>
+          <AnimatePresence mode="popLayout">
+            {files.map(file => renderListItem(file, file.mimeType === 'application/vnd.google-apps.folder'))}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {gridSize !== 'list' && folders.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest pl-1">Folders</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+            <AnimatePresence mode="popLayout">
+              {folders.map(folder => renderFolderGridItem(folder))}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {gridSize !== 'list' && standardFiles.length > 0 && (
+        <div className="space-y-3">
+          {folders.length > 0 && <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest pl-1">Files</h3>}
+          <div className={gridClasses[gridSize]}>
+            <AnimatePresence mode="popLayout">
+              {standardFiles.map(file => renderFileGridItem(file))}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {files.length === 0 && !loading && (
+        <div className="py-20 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+          <p className="text-slate-400 font-medium">No files found in this folder.</p>
+        </div>
+      )}
 
       {/* Preview Modal */}
       <AnimatePresence>

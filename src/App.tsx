@@ -300,7 +300,7 @@ export default function App() {
                     exit={{ opacity: 0, width: 0 }}
                     className="whitespace-nowrap overflow-hidden"
                   >
-                    Admin Center
+                    {googleAccessToken ? 'Admin Center' : 'Admin Login'}
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -506,8 +506,8 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+          <div className="w-full mx-auto max-w-[1600px]">
             {viewMode === 'assets' ? (
               <AssetsView 
                 key={`assets-view-${homeResetToken}`}
