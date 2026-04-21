@@ -12,7 +12,8 @@ import {
   Home,
   Grid2X2,
   Square,
-  Upload
+  Upload,
+  ArrowUpDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Asset, ASSET_CATEGORIES } from '../types';
@@ -45,6 +46,7 @@ export const AssetsView = ({
 }) => {
   const [gridSize, setGridSize] = useState<'list' | 'small' | 'medium' | 'large'>('medium');
   const [folderStack, setFolderStack] = useState<{id: string, name: string}[]>([{id: ROOT_FOLDER_ID, name: 'Root'}]);
+  const [sortOption, setSortOption] = useState<string>('name-asc');
   
   useEffect(() => {
     if (initialFolder) {
@@ -55,6 +57,34 @@ export const AssetsView = ({
 
   const currentFolder = folderStack[folderStack.length - 1];
   const { files, loading, fetchFiles, uploadFile: originalUpload, deleteFile: originalDelete } = useGoogleDrive(googleAccessToken, currentFolder.id, onGoogleLogout);
+
+  const sortedFiles = React.useMemo(() => {
+    return [...files].sort((a, b) => {
+      // Always put folders first, regardless of sort option
+      const isAFolder = a.mimeType === 'application/vnd.google-apps.folder';
+      const isBFolder = b.mimeType === 'application/vnd.google-apps.folder';
+      if (isAFolder && !isBFolder) return -1;
+      if (!isAFolder && isBFolder) return 1;
+
+      switch (sortOption) {
+        case 'name-asc':
+          return (a.name || '').localeCompare(b.name || '');
+        case 'name-desc':
+          return (b.name || '').localeCompare(a.name || '');
+        case 'date-desc':
+          return new Date(b.modifiedTime || 0).getTime() - new Date(a.modifiedTime || 0).getTime();
+        case 'date-asc':
+          return new Date(a.modifiedTime || 0).getTime() - new Date(b.modifiedTime || 0).getTime();
+        case 'size-desc':
+          return (parseInt(b.size) || 0) - (parseInt(a.size) || 0);
+        case 'size-asc':
+          return (parseInt(a.size) || 0) - (parseInt(b.size) || 0);
+        default:
+          return 0;
+      }
+    });
+  }, [files, sortOption]);
+
 
   const uploadFile = async (file: File) => {
     try {
@@ -134,12 +164,18 @@ export const AssetsView = ({
                 </div>
                 <p className="text-slate-500 text-sm">Manage files directly in your shared marketing folder.</p>
               </div>
+
+              {googleAccessToken && (
+                <div className="shrink-0">
+                  <UploadZone onUpload={uploadFile} loading={loading} isSmall />
+                </div>
+              )}
             </div>
 
             {googleAccessToken ? (
               <div className="space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center gap-4 py-1">
                     {/* Breadcrumbs */}
                     <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
                       {folderStack.map((folder, index) => (
@@ -161,9 +197,23 @@ export const AssetsView = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <UploadZone onUpload={uploadFile} loading={loading} isSmall />
-                    
+                  <div className="flex flex-row items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm font-medium text-slate-600 focus-within:ring-2 focus-within:ring-amber-500/50 transition-all w-fit">
+                      <ArrowUpDown className="w-4 h-4 text-slate-400" />
+                      <select 
+                        value={sortOption}
+                        onChange={(e) => setSortOption(e.target.value)}
+                        className="bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer appearance-none pr-4"
+                      >
+                        <option value="name-asc">Name (A-Z)</option>
+                        <option value="name-desc">Name (Z-A)</option>
+                        <option value="date-desc">Newest First</option>
+                        <option value="date-asc">Oldest First</option>
+                        <option value="size-desc">Largest First</option>
+                        <option value="size-asc">Smallest First</option>
+                      </select>
+                    </div>
+
                     <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
                       {(['list', 'small', 'medium', 'large'] as const).map((size) => (
                         <button
@@ -187,7 +237,7 @@ export const AssetsView = ({
 
                 <div className="space-y-8">
                   <AssetGallery 
-                    files={files} 
+                    files={sortedFiles} 
                     loading={loading} 
                     onDelete={deleteFile} 
                     onFolderClick={handleFolderClick}

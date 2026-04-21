@@ -18,7 +18,7 @@ export const useGoogleDrive = (
     setError(null);
     try {
       const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${currentFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink)&key=${API_KEY}`,
+        `https://www.googleapis.com/drive/v3/files?q='${currentFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink,modifiedTime,size)&key=${API_KEY}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
